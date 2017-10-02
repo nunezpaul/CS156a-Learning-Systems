@@ -1,0 +1,153 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Oct  1 20:45:22 2017
+
+@author: Paul Nunez
+"""
+from random import uniform
+import numpy as np
+from functools import partial
+import matplotlib.pyplot as plt
+
+def n2dpoints(n):
+    #randomly generate 2D array of n random points between -1 and 1
+    holdx1 = [0]*n
+    holdx2 = [0]*n
+    for i in range(n):
+        holdx1[i] = uniform(-1,1)
+        holdx2[i] = uniform(-1,1)
+    return holdx1, holdx2
+
+#This can definitely be optimized but I do not have the time to do so
+def evalPoints(linexs, lineys, x1, x2 ):
+    #used to classify the points x1,x2 compared to the line (linexs and lineys)
+    posx1 = []
+    posx2 = []
+    negx1 = []
+    negx2 = []
+    slope = (lineys[1]-lineys[0])/(linexs[1]-linexs[0]); yo = lineys[0]
+    for i in range(len(x1)):
+        y = slope*x1[i]+yo
+        if( y<x2[i]):
+            posx1.append(x1[i])
+            posx2.append(x2[i])
+        else:
+            negx1.append(x1[i])
+            negx2.append(x2[i])
+    return posx1, posx2, negx1, negx2
+
+#optimized but unused version of the function above
+def evalPoint(linexs, lineys, x1,x2):
+    slope = (lineys[1]-lineys[0])/(linexs[1]-linexs[0]); yo = lineys[0]
+    y = slope*x1+yo
+    if (x2 > y):
+        return 1 #True
+    else:
+        return -1 #False
+
+def sign(w, X):
+    #output 1 for values that are >0
+    #output -1 for values that are <0
+    #output 0 for values that are 0
+    check = np.dot(w, X)
+    if check > 0:
+        return 1
+    elif check < 0:
+        return -1
+    else:
+        return 0
+        
+def checkValues(hofX, Y):
+    #used in conjunction with map function to check for misclassified points
+    return bool(hofX == Y)
+
+#This is the actual perceptron learning algorithm
+def PLA(Npoints):
+    #generate 2D training points (x1,x2) and test points (rx1, rx2)
+    x1, x2 = n2dpoints(Npoints)
+    rx1, rx2 = n2dpoints(100)
+    
+    #generate the seperating line to classify points
+    linexs, lineys = n2dpoints(2)
+    slope = (lineys[1]-lineys[0])/(linexs[1]-linexs[0]); yo = lineys[0]
+    lxs = [1,-1]; lys = (slope*lxs[0]+yo,slope*lxs[1]+yo)
+    
+    #classify the training and test points
+    posx1, posx2, negx1, negx2 = evalPoints(linexs, lineys, x1, x2)
+    
+    #used but optimized compared to above.
+#    Y = map(partial(evalPoint, linexs, lineys), x1, x2)
+    
+    #check classification of x1 and x2
+#    plt.plot(lxs, lys, 'black', posx1, posx2, 'bs', negx1, negx2, 'r^')
+        
+    #put training points into appropriate array/format
+    Xpos = np.array((np.ones(len(posx1)), posx1, posx2), ndmin = 2)
+    Ypos = np.array(np.ones(len(posx1)), ndmin = 2)
+    Xneg = np.array((np.ones(len(negx1)),negx1, negx2), ndmin = 2)
+    Yneg = np.array(-1*np.ones(len(negx1)), ndmin = 2)
+    X = np.transpose(np.concatenate((Xpos, Xneg), axis = 1))
+    Y = np.transpose(np.concatenate((Ypos, Yneg), axis = 1))
+    
+    #initialize weights for PLA
+    w = np.zeros((3))
+    
+    #Iterate until covergance or N = 11000
+    for N in range(11000):
+        #determine what the output is for the hypothesis for training points
+        hofX = map(partial(sign, w), X)
+        
+        #find the first misclassified point
+        for i in range(len(hofX)):
+            if hofX[i] != Y[i]:
+                break
+    
+        #if all points are correct then stop iterations
+        if i == len(hofX)-1:
+            break
+        else:
+            #else continue iterating and update the value of w
+            w = w+Y[i]*X[i]    
+        
+    #create the PLA seperating line to be drawn later
+    target_xs = np.array((-1,1))
+    target_ys = -1/w[2]*(w[0]+w[1]*target_xs)
+    
+    rposx1, rposx2, rnegx1, rnegx2 = evalPoints(lxs, lys, rx1, rx2)
+    
+    #put test points into appropriate array/format
+    rXpos = np.array((np.ones(len(rposx1)), rposx1, rposx2), ndmin = 2)
+    rYpos = np.array(np.ones(len(rposx1)), ndmin = 2)
+    rXneg = np.array((np.ones(len(rnegx1)),rnegx1, rnegx2), ndmin = 2)
+    rYneg = np.array(-1*np.ones(len(rnegx1)), ndmin = 2)
+    rX = np.transpose(np.concatenate((rXpos, rXneg), axis = 1))
+    rY = np.transpose(np.concatenate((rYpos, rYneg), axis = 1))
+    
+    #determine the output of the test points with hypothesis
+    hofrX = map(partial(sign, w), rX)
+    
+    #determine the number of incorrectly classified points
+    error_count = len(rY) - sum(map(checkValues, hofrX, rY))
+    
+    #plot the separating line, training points that correspond to +1, training 
+    #points that correspond to -1 as well as the PLA result
+#    plt.plot(lxs, lys, 'black', posx1, posx2, 'bs', negx1, negx2, 'r^', 
+#             target_xs, target_ys, '--')   
+#    
+    #same as above but for the test points 
+#    plt.plot(lxs, lys, 'black', rposx1, rposx2, 'bs', rnegx1, rnegx2, 'r^', 
+#             target_xs, target_ys, '--')
+#       
+    #return the number of iterations necessary to converage
+    #and how many missclassified points from the test points  
+    return N, error_count
+    
+#Running some stats on the above algorithm with N samples
+N = 1000.
+N_iterations = [0]*N
+error_count = [0]*N
+for i in range(N):
+    N_iterations[i], error_count[i] = PLA(100)
+    
+percentage_error = sum(error_count)/(N*100.)
+mean_N = np.mean(N_iterations)
